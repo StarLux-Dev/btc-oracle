@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e17">
+<title>BTC Oracle — Live Analysis</title>
+<link rel="manifest" href="/static/manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;800&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-card: #111827;
+  --bg-card-hover: #1a2236;
+  --border: #1e293b;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-bull: #10b981;
+  --accent-bear: #ef4444;
+  --accent-gold: #f59e0b;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --glow-bull: rgba(16, 185, 129, 0.15);
+  --glow-bear: rgba(239, 68, 68, 0.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated background */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 92, 246, 0.06), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; padding-bottom: 80px; }
+
+/* Header */
+.header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 14, 23, 0.85);
+}
+
+.header h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.header h1 span { color: var(--accent-gold); }
+
+.live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-bull);
+  animation: pulse 2s infinite;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+}
+
+.status {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Price Hero */
+.price-hero {
+  padding: 24px 20px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.price-hero .price {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  margin: 4px 0;
+  transition: color 0.3s;
+}
+
+.price-hero .price.up { color: var(--accent-bull); }
+.price-hero .price.down { color: var(--accent-bear); }
+
+.price-hero .change {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: inline-block;
+  margin: 4px 0;
+}
+
+.price-hero .change.up { background: var(--glow-bull); color: var(--accent-bull); }
+.price-hero .change.down { background: var(--glow-bear); color: var(--accent-bear); }
+
+.price-hero .meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Navigation tabs */
+.nav-tabs {
+  display: flex;
+  overflow-x: auto;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  gap: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.nav-tabs::-webkit-scrollbar { display: none; }
+
+.nav-tab {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.nav-tab.active {
+  color: var(--accent-gold);
+  border-bottom-color: var(--accent-gold);
+}
+
+/* Sections */
+.section { display: none; padding: 16px; }
+.section.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: background 0.2s;
+}
+
+.card:hover { background: var(--bg-card-hover); }
+
+.card-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Probability bars */
+.prob-bar {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+  gap: 10px;
+}
+
+.prob-bar .label {
+  font-size: 13px;
+  width: 120px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.prob-bar .bar-container {
+  flex: 1;
+  height: 24px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.prob-bar .bar-fill {
+  height: 100%;
+  border-radius: 12px;
+  transition: width 1s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: white;
+  min-width: 40px;
+}
+
+.bar-fill.bull { background: linear-gradient(90deg, rgba(16,185,129,0.3), var(--accent-bull)); }
+.bar-fill.bear { background: linear-gradient(90deg, rgba(239,68,68,0.3), var(--accent-bear)); }
+.bar-fill.neutral { background: linear-gradient(90deg, rgba(148,163,184,0.3), var(--text-muted)); }
+.bar-fill.gold { background: linear-gradient(90deg, rgba(245,158,11,0.3), var(--accent-gold)); }
+
+/* Scenario grid */
+.scenario-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.scenario-item {
+  padding: 14px;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+
+.scenario-item .emoji { font-size: 20px; margin-bottom: 4px; }
+.scenario-item .pct { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 800; }
+.scenario-item .desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* Fear & Greed gauge */
+.gauge-container {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.gauge {
+  width: 200px;
+  height: 100px;
+  position: relative;
+}
+
+/* Advisor cards */
+.advisor-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.advisor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.advisor-name { font-weight: 700; font-size: 15px; }
+.advisor-title { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.advisor-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.advisor-badge.bull { background: var(--glow-bull); color: var(--accent-bull); }
+.advisor-badge.bear { background: var(--glow-bear); color: var(--accent-bear); }
+.advisor-badge.neutral { background: rgba(148,163,184,0.15); color: var(--text-secondary); }
+
+.advisor-strategy {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.advisor-levels {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.level-chip {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid var(--border);
+}
+
+.level-chip.entry { border-color: var(--accent-blue); color: var(--accent-blue); }
+.level-chip.stop { border-color: var(--accent-bear); color: var(--accent-bear); }
+.level-chip.target { border-color: var(--accent-bull); color: var(--accent-bull); }
+
+/* Backtest results */
+.backtest-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Chart containers */
+.chart-container {
+  position: relative;
+  height: 280px;
+  margin: 12px 0;
+}
+
+@media (min-width: 768px) {
+  .chart-container { height: 400px; }
+  .price-hero .price { font-size: 56px; }
+  .scenario-grid { grid-template-columns: repeat(5, 1fr); }
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-muted);
+  gap: 10px;
+}
+
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Refresh button */
+.refresh-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+  z-index: 1000;
+  transition: transform 0.2s;
+}
+
+.refresh-btn:active { transform: scale(0.9); }
+
+/* Model accuracy badge */
+.accuracy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.accuracy-badge.good { background: var(--glow-bull); color: var(--accent-bull); }
+.accuracy-badge.medium { background: rgba(245,158,11,0.15); color: var(--accent-gold); }
+.accuracy-badge.poor { background: var(--glow-bear); color: var(--accent-bear); }
+
+/* Halving cycle progress */
+.cycle-bar {
+  height: 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.cycle-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple), var(--accent-gold));
+  border-radius: 4px;
+  transition: width 1s;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1><span>₿</span> BTC Oracle</h1>
+    <div class="status">
+      <span class="live-dot"></span>
+      <span id="lastUpdate">connecting...</span>
+    </div>
+  </div>
+
+  <!-- Price Hero -->
+  <div class="price-hero">
+    <div class="price up" id="currentPrice">$--,---</div>
+    <div class="change up" id="priceChange">+0.00%</div>
+    <div class="meta">
+      <span id="marketCap">MCap: --</span> · <span id="volume24h">Vol: --</span>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-tab="forecast">Forecast</div>
+    <div class="nav-tab" data-tab="chart">Chart</div>
+    <div class="nav-tab" data-tab="sentiment">Sentiment</div>
+    <div class="nav-tab" data-tab="advisors">Advisors</div>
+    <div class="nav-tab" data-tab="backtest">Backtest</div>
+    <div class="nav-tab" data-tab="cycle">Cycle</div>
+  </div>
+
+  <!-- FORECAST TAB -->
+  <div class="section active" id="tab-forecast">
+    <div class="card">
+      <div class="card-title">14-Day Probability</div>
+      <div class="prob-bar">
+        <span class="label">P(Up 14d)</span>
+        <div class="bar-container"><div class="bar-fill bull" id="pUp14d" style="width:0%">--%</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">P(>$80,000)</span>
+        <div class="bar-container"><div class="bar-fill gold" id="p80k" style="width:0%">--%</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">P(>$85,000)</span>
+        <div class="bar-container"><div class="bar-fill bull" id="p85k" style="width:0%">--%</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">P(<$70,000)</span>
+        <div class="bar-container"><div class="bar-fill bear" id="p70k" style="width:0%">--%</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Scenario Breakdown</div>
+      <div class="scenario-grid">
+        <div class="scenario-item" style="background:var(--glow-bull)">
+          <div class="emoji">🟢</div>
+          <div class="pct" id="scBull" style="color:var(--accent-bull)">--%</div>
+          <div class="desc">Strong Bull >+5%</div>
+        </div>
+        <div class="scenario-item">
+          <div class="emoji">🟡</div>
+          <div class="pct" id="scMildBull" style="color:var(--accent-gold)">--%</div>
+          <div class="desc">Mild Bull 0-5%</div>
+        </div>
+        <div class="scenario-item">
+          <div class="emoji">⚪</div>
+          <div class="pct" id="scSideways" style="color:var(--text-secondary)">--%</div>
+          <div class="desc">Sideways ±3%</div>
+        </div>
+        <div class="scenario-item" style="background:var(--glow-bear)">
+          <div class="emoji">🔴</div>
+          <div class="pct" id="scBear" style="color:var(--accent-bear)">--%</div>
+          <div class="desc">Strong Bear <-5%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Forecast Range</div>
+      <div class="chart-container"><canvas id="forecastChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Model Info</div>
+      <div id="modelInfo" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-secondary);line-height:1.8">
+        Loading models...
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART TAB -->
+  <div class="section" id="tab-chart">
+    <div class="card">
+      <div class="card-title">BTC/USD — 365 Days</div>
+      <div class="chart-container"><canvas id="historyChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Volume</div>
+      <div class="chart-container" style="height:150px"><canvas id="volumeChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SENTIMENT TAB -->
+  <div class="section" id="tab-sentiment">
+    <div class="card">
+      <div class="card-title">Fear & Greed Index</div>
+      <div style="text-align:center;padding:20px 0">
+        <div id="fgValue" style="font-family:'JetBrains Mono',monospace;font-size:64px;font-weight:800">--</div>
+        <div id="fgLabel" style="font-size:16px;color:var(--text-muted);margin-top:4px">Loading...</div>
+      </div>
+      <div class="chart-container" style="height:180px"><canvas id="fgChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Market Sentiment Signals</div>
+      <div id="sentimentSignals" style="font-size:13px;line-height:2;color:var(--text-secondary)">
+        Loading sentiment data...
+      </div>
+    </div>
+  </div>
+
+  <!-- ADVISORS TAB -->
+  <div class="section" id="tab-advisors">
+    <div class="card" style="border-color:var(--accent-gold)">
+      <div class="card-title" style="color:var(--accent-gold)">Panel Consensus</div>
+      <div style="text-align:center;padding:8px 0">
+        <div style="font-size:32px;font-weight:800;color:var(--accent-bull)" id="consensusVerdict">BULLISH</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Conviction-weighted: <span id="consensusAlloc">14.1%</span> allocation</div>
+      </div>
+    </div>
+
+    <div class="advisor-card">
+      <div class="advisor-header">
+        <div><div class="advisor-name">🛡️ Dr. Kovačová</div><div class="advisor-title">Conservative — CFA, Wealth Advisor</div></div>
+        <div class="advisor-badge bull">CAUTIOUS BULL</div>
+      </div>
+      <div class="advisor-strategy">DCA 3% of portfolio over 12 weeks. "Patience will be rewarded."</div>
+      <div class="advisor-levels">
+        <span class="level-chip entry">Entry: DCA</span>
+        <span class="level-chip stop">Stop: $58K</span>
+        <span class="level-chip target">TP: $95-120K</span>
+      </div>
+    </div>
+
+    <div class="advisor-card">
+      <div class="advisor-header">
+        <div><div class="advisor-name">📊 Marcus Chen</div><div class="advisor-title">Moderate — CMT, Technical Strategy</div></div>
+        <div class="advisor-badge bull">CONDITIONAL</div>
+      </div>
+      <div class="advisor-strategy">Scaled entry: 4% now + 4% on $80K breakout. Tight stop $73K.</div>
+      <div class="advisor-levels">
+        <span class="level-chip entry">Entry: $75.8K</span>
+        <span class="level-chip stop">Stop: $73K</span>
+        <span class="level-chip target">TP: $85-100K</span>
+      </div>
+    </div>
+
+    <div class="advisor-card">
+      <div class="advisor-header">
+        <div><div class="advisor-name">🔬 Dr. Petrovská</div><div class="advisor-title">Growth — PhD, Quant Strategist</div></div>
+        <div class="advisor-badge bull">BULLISH</div>
+      </div>
+      <div class="advisor-strategy">Half-Kelly optimized: 12% portfolio. "Positive EV bet, statistically unusual conditions."</div>
+      <div class="advisor-levels">
+        <span class="level-chip entry">Entry: Market</span>
+        <span class="level-chip stop">Stop: $67K</span>
+        <span class="level-chip target">TP: $87-110K</span>
+      </div>
+    </div>
+
+    <div class="advisor-card">
+      <div class="advisor-header">
+        <div><div class="advisor-name">⛓️ Jakub Novotný</div><div class="advisor-title">Aggressive — On-Chain Analyst</div></div>
+        <div class="advisor-badge bull">STRONG BULL</div>
+      </div>
+      <div class="advisor-strategy">30% portfolio at market. "Supply squeeze will force price discovery. Never seen this setup."</div>
+      <div class="advisor-levels">
+        <span class="level-chip entry">Entry: Market</span>
+        <span class="level-chip stop">Stop: $62K</span>
+        <span class="level-chip target">TP: $95-130K</span>
+      </div>
+    </div>
+
+    <div class="advisor-card">
+      <div class="advisor-header">
+        <div><div class="advisor-name">🎓 Prof. Horváth</div><div class="advisor-title">Conservative — PhD, Academic</div></div>
+        <div class="advisor-badge neutral">SKEPTICAL</div>
+      </div>
+      <div class="advisor-strategy">2% via spot ETF, hold 5+ years. "ARIMA(0,0,0) says returns are unpredictable."</div>
+      <div class="advisor-levels">
+        <span class="level-chip entry">Entry: ETF</span>
+        <span class="level-chip stop">No stop</span>
+        <span class="level-chip target">Hold 5yr</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BACKTEST TAB -->
+  <div class="section" id="tab-backtest">
+    <div class="card">
+      <div class="card-title">Model Accuracy Tracker</div>
+      <div id="backtestAccuracy" style="text-align:center;padding:16px">
+        <div class="loading"><div class="spinner"></div>Running backtest...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent Prediction History</div>
+      <div id="backtestResults">
+        <div class="loading"><div class="spinner"></div>Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CYCLE TAB -->
+  <div class="section" id="tab-cycle">
+    <div class="card">
+      <div class="card-title">Halving Cycle Position</div>
+      <div style="text-align:center;margin:12px 0">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:800;color:var(--accent-purple)">
+          Day 740 / 1,461
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">51% through Cycle 5</div>
+      </div>
+      <div class="cycle-bar"><div class="cycle-fill" style="width:51%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:4px">
+        <span>Halving 4 (Apr 2024)</span>
+        <span>Halving 5 (~Apr 2028)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Composite Factor Score</div>
+      <div style="text-align:center;padding:12px 0">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:42px;font-weight:800;color:var(--accent-bull)">+8/20</div>
+        <div style="font-size:14px;color:var(--accent-gold);margin-top:4px">70% Bullish</div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Exchange reserves</span>
+        <div class="bar-container"><div class="bar-fill bull" style="width:100%">+2 ⛓️ 7yr low</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Whale buying</span>
+        <div class="bar-container"><div class="bar-fill bull" style="width:100%">+2 🐋 Record</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">ETF demand</span>
+        <div class="bar-container"><div class="bar-fill bull" style="width:100%">+2 📈 $2.4B/mo</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Supply squeeze</span>
+        <div class="bar-container"><div class="bar-fill bull" style="width:100%">+2 🔥 3:1 ratio</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Volatility</span>
+        <div class="bar-container"><div class="bar-fill bull" style="width:75%">+1 ⚡ Low/compressed</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Fear sentiment</span>
+        <div class="bar-container"><div class="bar-fill bull" style="width:75%">+1 😱→📈 Contrarian</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Price return</span>
+        <div class="bar-container"><div class="bar-fill neutral" style="width:50%">0 +18% (modest)</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Drawdown</span>
+        <div class="bar-container"><div class="bar-fill bear" style="width:25%">-1 📉 -39% from ATH</div></div>
+      </div>
+      <div class="prob-bar">
+        <span class="label">Retail FOMO</span>
+        <div class="bar-container"><div class="bar-fill bear" style="width:25%">-1 😴 Low participation</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Historical Warning</div>
+      <div style="padding:12px;background:var(--glow-bear);border-radius:12px;font-size:13px;color:var(--text-secondary);line-height:1.7">
+        ⚠️ At day ~740 in <b>every</b> previous cycle, BTC saw further 3-6 month declines 
+        (avg -21%). Cycles 2-4 all experienced additional pain before the true recovery.
+        However, none had ETF flows, 7yr-low exchange reserves, or institutional demand at this scale.
+      </div>
+    </div>
+  </div>
+</div>
+
+<button class="refresh-btn" onclick="refreshAll()" title="Refresh">↻</button>
+
+<script>
+// ============================================================
+// APP STATE
+// ============================================================
+const API_BASE = window.location.origin;
+let charts = {};
+let currentTab = 'forecast';
+
+// ============================================================
+// TAB NAVIGATION
+// ============================================================
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    const tabId = tab.dataset.tab;
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+    currentTab = tabId;
+    
+    // Lazy-load tab data
+    if (tabId === 'chart') loadHistory();
+    if (tabId === 'sentiment') loadSentiment();
+    if (tabId === 'backtest') loadBacktest();
+  });
+});
+
+// ============================================================
+// DATA FETCHING
+// ============================================================
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch (e) {
+    console.error(`Fetch failed: ${url}`, e);
+    return null;
+  }
+}
+
+async function loadPrice() {
+  const data = await fetchJSON(`${API_BASE}/api/price`);
+  if (!data || data.error) return;
+  
+  const el = document.getElementById('currentPrice');
+  const changeEl = document.getElementById('priceChange');
+  const isUp = data.change_24h >= 0;
+  
+  el.textContent = `$${data.price.toLocaleString('en-US', {maximumFractionDigits: 0})}`;
+  el.className = `price ${isUp ? 'up' : 'down'}`;
+  
+  changeEl.textContent = `${isUp ? '+' : ''}${data.change_24h.toFixed(2)}%`;
+  changeEl.className = `change ${isUp ? 'up' : 'down'}`;
+  
+  document.getElementById('marketCap').textContent = 
+    `MCap: $${(data.market_cap / 1e12).toFixed(2)}T`;
+  document.getElementById('volume24h').textContent = 
+    `Vol: $${(data.volume_24h / 1e9).toFixed(1)}B`;
+  document.getElementById('lastUpdate').textContent = 
+    `LIVE · ${new Date().toLocaleTimeString()}`;
+}
+
+async function loadForecast() {
+  const data = await fetchJSON(`${API_BASE}/api/forecast?horizon=14`);
+  if (!data || data.error) return;
+  
+  const p = data.probabilities || {};
+  
+  // Update probability bars
+  animateBar('pUp14d', p.p_up_14d, 'bull');
+  animateBar('p80k', p.p_above_80k, 'gold');
+  animateBar('p85k', p.p_above_85k, 'bull');
+  animateBar('p70k', p.p_below_70k, 'bear');
+  
+  // Scenarios
+  document.getElementById('scBull').textContent = `${(p.strong_bull||0).toFixed(1)}%`;
+  document.getElementById('scMildBull').textContent = `${(p.mild_bull||0).toFixed(1)}%`;
+  document.getElementById('scSideways').textContent = `${(p.sideways||0).toFixed(1)}%`;
+  document.getElementById('scBear').textContent = `${(p.strong_bear||0).toFixed(1)}%`;
+  
+  // Model info
+  document.getElementById('modelInfo').innerHTML = `
+    ARIMA Order: (${(data.arima_order||[0,0,0]).join(',')}) · AIC: ${data.arima_aic?.toFixed(0) || 'N/A'}<br>
+    GARCH α: ${data.garch_alpha?.toFixed(4) || '--'} · β: ${data.garch_beta?.toFixed(4) || '--'}<br>
+    EGARCH leverage γ: ${data.egarch_leverage?.toFixed(4) || '--'}<br>
+    Daily vol: ${data.current_vol_daily?.toFixed(2) || '--'}% · Annual: ${data.current_vol_annual?.toFixed(1) || '--'}%<br>
+    Sentiment adj: ${data.sentiment_adjustment?.toFixed(3) || '0'}%/day<br>
+    Distribution: P5=$${(data.distribution?.p5||0).toLocaleString('en',{maximumFractionDigits:0})} · 
+    Median=$${(data.distribution?.median||0).toLocaleString('en',{maximumFractionDigits:0})} · 
+    P95=$${(data.distribution?.p95||0).toLocaleString('en',{maximumFractionDigits:0})}
+  `;
+  
+  // Forecast chart
+  if (data.forecast) drawForecastChart(data);
+}
+
+async function loadHistory() {
+  const data = await fetchJSON(`${API_BASE}/api/history/365`);
+  if (!data || data.error) return;
+  drawHistoryChart(data);
+}
+
+async function loadSentiment() {
+  const data = await fetchJSON(`${API_BASE}/api/sentiment`);
+  if (!data) return;
+  
+  const fg = data.fear_greed || {};
+  const fgEl = document.getElementById('fgValue');
+  const fgLabel = document.getElementById('fgLabel');
+  
+  if (fg.current) {
+    fgEl.textContent = fg.current;
+    fgEl.style.color = fg.current < 25 ? 'var(--accent-bear)' : 
+                        fg.current < 50 ? 'var(--accent-gold)' : 'var(--accent-bull)';
+    fgLabel.textContent = fg.label || 'Unknown';
+  }
+  
+  // Signals
+  const signals = [];
+  if (fg.current < 25) signals.push('😱 Extreme Fear — historically contrarian bullish');
+  else if (fg.current < 40) signals.push('😰 Fear zone — caution but may signal bottom');
+  else if (fg.current > 75) signals.push('🤑 Extreme Greed — potential distribution zone');
+  
+  if (data.trending?.btc_trending) signals.push('🔥 BTC is trending on CoinGecko');
+  
+  signals.push(`📊 Trending coins: ${(data.trending?.trending_coins || ['N/A']).join(', ')}`);
+  
+  document.getElementById('sentimentSignals').innerHTML = signals.map(s => `<div>${s}</div>`).join('');
+  
+  if (fg.history?.length) drawFearGreedChart(fg.history);
+}
+
+async function loadBacktest() {
+  const data = await fetchJSON(`${API_BASE}/api/backtest?test_days=30&horizon=7`);
+  if (!data || data.error) {
+    document.getElementById('backtestAccuracy').innerHTML = 
+      `<div style="color:var(--text-muted)">Backtest unavailable: ${data?.error || 'no data'}</div>`;
+    return;
+  }
+  
+  const acc = data.directional_accuracy_pct || 0;
+  const cls = acc > 55 ? 'good' : (acc > 45 ? 'medium' : 'poor');
+  
+  document.getElementById('backtestAccuracy').innerHTML = `
+    <div class="accuracy-badge ${cls}" style="font-size:28px;padding:12px 24px;margin-bottom:12px">
+      ${acc.toFixed(1)}% Direction Accuracy
+    </div>
+    <div style="font-size:13px;color:var(--text-muted)">
+      ${data.n_tests} tests · Mean error: ${data.mean_abs_error_pct}% · Median: ${data.median_abs_error_pct}%
+    </div>
+  `;
+  
+  const resultsHTML = (data.results || []).map(r => `
+    <div class="backtest-row">
+      <span>${r.date}</span>
+      <span>Pred: $${r.predicted.toLocaleString('en',{maximumFractionDigits:0})}</span>
+      <span>Act: $${r.actual.toLocaleString('en',{maximumFractionDigits:0})}</span>
+      <span style="color:${r.direction_correct ? 'var(--accent-bull)' : 'var(--accent-bear)'}">
+        ${r.direction_correct ? '✅' : '❌'} ${r.error_pct > 0 ? '+' : ''}${r.error_pct}%
+      </span>
+    </div>
+  `).join('');
+  
+  document.getElementById('backtestResults').innerHTML = resultsHTML || '<div style="color:var(--text-muted)">No results</div>';
+}
+
+// ============================================================
+// CHART DRAWING
+// ============================================================
+function drawForecastChart(data) {
+  const ctx = document.getElementById('forecastChart');
+  if (charts.forecast) charts.forecast.destroy();
+  
+  const fc = data.forecast;
+  charts.forecast = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: fc.dates,
+      datasets: [
+        {
+          label: 'Central', data: fc.central,
+          borderColor: '#10b981', borderWidth: 2.5,
+          pointRadius: 0, tension: 0.3,
+        },
+        {
+          label: '80% Band', data: fc.upper80,
+          borderColor: 'transparent', backgroundColor: 'rgba(16,185,129,0.15)',
+          fill: '+1', pointRadius: 0,
+        },
+        {
+          label: '', data: fc.lower80,
+          borderColor: 'transparent', backgroundColor: 'rgba(16,185,129,0.15)',
+          fill: false, pointRadius: 0,
+        },
+        {
+          label: '95% Band', data: fc.upper95,
+          borderColor: 'rgba(16,185,129,0.3)', borderWidth: 1, borderDash: [4,4],
+          fill: false, pointRadius: 0,
+        },
+        {
+          label: '', data: fc.lower95,
+          borderColor: 'rgba(16,185,129,0.3)', borderWidth: 1, borderDash: [4,4],
+          fill: false, pointRadius: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { color: '#94a3b8', font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { color: '#64748b', maxRotation: 45, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+        y: { ticks: { color: '#64748b', callback: v => `$${(v/1000).toFixed(0)}K`, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+      },
+    },
+  });
+}
+
+function drawHistoryChart(data) {
+  const ctx = document.getElementById('historyChart');
+  if (charts.history) charts.history.destroy();
+  
+  charts.history = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.dates,
+      datasets: [{
+        label: 'BTC/USD', data: data.prices,
+        borderColor: '#f59e0b', borderWidth: 1.5,
+        pointRadius: 0, tension: 0.1,
+        fill: { target: 'origin', above: 'rgba(245,158,11,0.05)' },
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#64748b', maxTicksLimit: 8, font: { size: 9 } }, grid: { display: false } },
+        y: { ticks: { color: '#64748b', callback: v => `$${(v/1000).toFixed(0)}K`, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+      },
+    },
+  });
+  
+  // Volume chart
+  const vctx = document.getElementById('volumeChart');
+  if (charts.volume) charts.volume.destroy();
+  charts.volume = new Chart(vctx, {
+    type: 'bar',
+    data: {
+      labels: data.dates,
+      datasets: [{
+        data: data.volumes.map(v => v / 1e9),
+        backgroundColor: 'rgba(59,130,246,0.3)',
+        borderColor: 'rgba(59,130,246,0.5)',
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: { ticks: { color: '#64748b', callback: v => `${v.toFixed(0)}B`, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+      },
+    },
+  });
+}
+
+function drawFearGreedChart(history) {
+  const ctx = document.getElementById('fgChart');
+  if (charts.fg) charts.fg.destroy();
+  
+  const reversed = [...history].reverse();
+  charts.fg = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: reversed.map((_, i) => `${reversed.length - i}d ago`),
+      datasets: [{
+        data: reversed.map(h => h.value),
+        borderColor: '#f59e0b', borderWidth: 2,
+        pointRadius: 0, tension: 0.3,
+        fill: { target: 'origin', above: 'rgba(245,158,11,0.1)' },
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#64748b', maxTicksLimit: 6, font: { size: 9 } }, grid: { display: false } },
+        y: { min: 0, max: 100, ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
+      },
+    },
+  });
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function animateBar(id, value, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.width = `${Math.min(value, 100)}%`;
+  el.textContent = `${value?.toFixed(1) || 0}%`;
+  el.className = `bar-fill ${cls}`;
+}
+
+async function refreshAll() {
+  const btn = document.querySelector('.refresh-btn');
+  btn.style.transform = 'rotate(360deg)';
+  setTimeout(() => btn.style.transform = '', 500);
+  
+  await loadPrice();
+  await loadForecast();
+  if (currentTab === 'chart') await loadHistory();
+  if (currentTab === 'sentiment') await loadSentiment();
+  if (currentTab === 'backtest') await loadBacktest();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  await loadPrice();
+  await loadForecast();
+  
+  // Auto-refresh every 60 seconds
+  setInterval(loadPrice, 60000);
+  setInterval(loadForecast, 300000); // Forecast every 5 min
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e1a">
+<title>BTC Oracle · Live Analysis</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23f7931a'/%3E%3Ctext x='50' y='72' font-family='serif' font-size='70' font-weight='900' text-anchor='middle' fill='%23000'%3E%E2%82%BF%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23f7931a'/%3E%3Ctext x='50' y='72' font-family='serif' font-size='70' font-weight='900' text-anchor='middle' fill='%23000'%3E%E2%82%BF%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #0a0e1a;
+  --bg-2: #131a2c;
+  --bg-3: #1a2238;
+  --bg-4: #232c45;
+  --line: #2a334d;
+  --text: #e8ecf5;
+  --text-2: #8b94ad;
+  --text-3: #5a6483;
+  --orange: #f7931a;
+  --orange-soft: rgba(247, 147, 26, 0.15);
+  --green: #4ade80;
+  --green-soft: rgba(74, 222, 128, 0.15);
+  --red: #f87171;
+  --red-soft: rgba(248, 113, 113, 0.15);
+  --blue: #60a5fa;
+  --purple: #c084fc;
+  --yellow: #fbbf24;
+  --mono: 'Space Mono', monospace;
+  --display: 'Bricolage Grotesque', sans-serif;
+}
+html, body {
+  height: 100%; overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 14px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+body { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Animated grid background */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: 
+    linear-gradient(rgba(247,147,26,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(247,147,26,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse at top, black 30%, transparent 80%);
+}
+body::after {
+  content: ''; position: fixed; top: -200px; right: -200px; width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(247,147,26,0.08), transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* Top bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--line);
+  padding: env(safe-area-inset-top) 16px 0;
+}
+.topbar-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; gap: 12px;
+}
+.brand {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 800; font-size: 18px; letter-spacing: -0.02em;
+}
+.brand-icon {
+  width: 28px; height: 28px; border-radius: 7px; background: var(--orange);
+  display: grid; place-items: center; color: #000; font-weight: 900;
+  font-family: serif; font-size: 18px;
+}
+.live-status {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 10px; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
+}
+
+/* Hero price */
+.hero {
+  padding: 24px 16px 16px;
+  position: relative; z-index: 1;
+}
+.hero-label {
+  font-family: var(--mono); font-size: 10px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 4px;
+}
+.hero-price {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(40px, 11vw, 64px);
+  letter-spacing: -0.04em; line-height: 1;
+  background: linear-gradient(180deg, #fff 0%, #b4bdd4 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero-meta {
+  display: flex; align-items: center; gap: 12px; margin-top: 8px;
+  font-family: var(--mono); font-size: 12px;
+}
+.change-pill {
+  padding: 4px 10px; border-radius: 999px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.change-pill.up { background: var(--green-soft); color: var(--green); }
+.change-pill.down { background: var(--red-soft); color: var(--red); }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 4px; padding: 0 16px; margin-bottom: 8px;
+  overflow-x: auto; scrollbar-width: none;
+  position: sticky; top: calc(env(safe-area-inset-top) + 53px); z-index: 40;
+  background: var(--bg);
+  padding-top: 8px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  padding: 8px 14px; border-radius: 999px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  font-size: 12px; font-weight: 600;
+  color: var(--text-2); cursor: pointer;
+  white-space: nowrap; transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.tab:active { transform: scale(0.95); }
+.tab.active {
+  background: var(--orange); color: #000; border-color: var(--orange);
+}
+
+/* Cards */
+.section { padding: 8px 16px; position: relative; z-index: 1; }
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.card-title {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.card-title h3 {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-2);
+}
+.card-title .badge {
+  font-family: var(--mono); font-size: 10px;
+  padding: 3px 8px; border-radius: 4px;
+  background: var(--bg-4); color: var(--text-2);
+}
+
+/* Grid stats */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+}
+.stat {
+  background: var(--bg-3); border-radius: 10px; padding: 10px 12px;
+}
+.stat-label {
+  font-family: var(--mono); font-size: 9px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;
+}
+.stat-value {
+  font-family: var(--mono); font-size: 14px; font-weight: 700;
+}
+
+/* Chart */
+.chart-container {
+  width: 100%; height: 180px; position: relative;
+}
+.chart-svg {
+  width: 100%; height: 100%; display: block;
+}
+.chart-tooltip {
+  position: absolute; background: var(--bg-4); padding: 6px 10px;
+  border-radius: 6px; font-family: var(--mono); font-size: 11px;
+  pointer-events: none; opacity: 0; transition: opacity 0.15s;
+  border: 1px solid var(--line); z-index: 5;
+}
+
+/* Probability bars */
+.prob-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.prob-row:last-child { margin-bottom: 0; }
+.prob-label {
+  font-size: 12px; color: var(--text-2);
+  flex: 0 0 110px; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prob-bar-bg {
+  flex: 1; height: 6px; background: var(--bg-4); border-radius: 3px;
+  overflow: hidden; position: relative;
+}
+.prob-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.prob-value {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  flex: 0 0 50px; text-align: right;
+}
+
+/* Model cards */
+.model-card {
+  background: var(--bg-3); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 8px;
+  border: 1px solid transparent;
+  transition: all 0.2s; cursor: pointer;
+}
+.model-card:active { transform: scale(0.98); }
+.model-card.best {
+  border-color: var(--orange);
+  background: linear-gradient(135deg, var(--bg-3), var(--orange-soft));
+}
+.model-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.model-name {
+  font-size: 13px; font-weight: 700;
+}
+.model-acc {
+  font-family: var(--mono); font-size: 10px;
+  padding: 2px 6px; border-radius: 4px;
+}
+.model-pred {
+  display: flex; gap: 12px; font-family: var(--mono); font-size: 11px;
+}
+.model-pred-item { color: var(--text-2); }
+.model-pred-item b { color: var(--text); font-weight: 700; }
+
+/* Advisor */
+.advisor {
+  background: var(--bg-3); border-radius: 14px; padding: 14px;
+  margin-bottom: 10px; border-left: 3px solid var(--orange);
+}
+.advisor-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.advisor-avatar {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: grid; place-items: center; font-size: 18px;
+  background: var(--bg-4);
+}
+.advisor-name { font-size: 13px; font-weight: 700; }
+.advisor-role { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
+.advisor-bias {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.advisor-opinion {
+  font-size: 12px; color: var(--text-2); line-height: 1.55;
+  margin-bottom: 10px;
+}
+.advisor-strategy {
+  background: var(--bg-2); border-radius: 8px; padding: 8px 10px;
+  font-family: var(--mono); font-size: 10px; line-height: 1.7;
+}
+.advisor-strategy span { color: var(--text-3); }
+
+/* Backtest log */
+.log-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.log-row:last-child { border-bottom: none; }
+.log-status {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px; font-weight: 700;
+}
+.log-status.correct { background: var(--green-soft); color: var(--green); }
+.log-status.wrong { background: var(--red-soft); color: var(--red); }
+.log-status.pending { background: var(--bg-4); color: var(--text-2); }
+.log-info { font-family: var(--mono); font-size: 11px; }
+.log-info b { color: var(--text); font-weight: 700; }
+.log-info span { color: var(--text-3); }
+.log-error {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  text-align: right;
+}
+
+/* Refresh button */
+.refresh-btn {
+  position: fixed; bottom: calc(20px + env(safe-area-inset-bottom));
+  right: 16px; z-index: 100;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--orange); color: #000; border: none;
+  display: grid; place-items: center; cursor: pointer;
+  box-shadow: 0 8px 32px rgba(247, 147, 26, 0.4);
+  transition: all 0.2s;
+}
+.refresh-btn:active { transform: scale(0.92); }
+.refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: calc(80px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  background: var(--bg-4); border: 1px solid var(--line);
+  padding: 10px 16px; border-radius: 999px;
+  font-size: 12px; font-weight: 600;
+  z-index: 200; opacity: 0; transition: opacity 0.3s, transform 0.3s;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Loading skeleton */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-3) 25%, var(--bg-4) 50%, var(--bg-3) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: fadeIn 0.3s; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Footer */
+.footer {
+  text-align: center; padding: 24px 16px;
+  font-family: var(--mono); font-size: 10px; color: var(--text-3);
+  line-height: 1.6;
+}
+.footer a { color: var(--orange); text-decoration: none; }
+
+/* Cycle progress */
+.cycle-bar {
+  height: 32px; background: var(--bg-4); border-radius: 8px;
+  position: relative; overflow: hidden; margin: 12px 0;
+}
+.cycle-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--yellow), var(--orange), var(--red));
+  border-radius: 8px;
+  position: relative;
+  transition: width 0.8s;
+}
+.cycle-marker {
+  position: absolute; top: -4px; bottom: -4px; width: 3px;
+  background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.6);
+}
+.cycle-labels {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 9px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+/* Macro signal pills */
+.signal-grid {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.signal-pill {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  padding: 5px 10px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.signal-pill.bull { background: var(--green-soft); color: var(--green); }
+.signal-pill.bear { background: var(--red-soft); color: var(--red); }
+.signal-pill.neutral { background: var(--bg-4); color: var(--text-2); }
+
+/* Verdict */
+.verdict {
+  text-align: center; padding: 16px;
+  background: linear-gradient(135deg, var(--bg-3), var(--bg-2));
+  border-radius: 14px; margin-bottom: 12px;
+  border: 1px solid var(--line);
+}
+.verdict-label {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--text-3); margin-bottom: 6px;
+}
+.verdict-value {
+  font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+}
+
+/* Update log */
+.update-log {
+  max-height: 200px; overflow-y: auto;
+  font-family: var(--mono); font-size: 10px; line-height: 1.7;
+}
+.update-log div { color: var(--text-3); padding: 2px 0; }
+.update-log div span { color: var(--green); }
+
+@media (min-width: 600px) {
+  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+  .section { max-width: 720px; margin: 0 auto; }
+  .topbar-inner { max-width: 720px; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-icon">₿</div>
+      <span>BTC Oracle</span>
+    </div>
+    <div class="live-status">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="liveText">LIVE</span>
+    </div>
+  </div>
+</header>
+
+<!-- Hero Price -->
+<section class="hero">
+  <div class="hero-label">BITCOIN / USD</div>
+  <div class="hero-price" id="heroPrice">—</div>
+  <div class="hero-meta">
+    <span class="change-pill" id="changePill">—</span>
+    <span style="color:var(--text-3)">24h • Updated <span id="updatedAt">—</span></span>
+  </div>
+</section>
+
+<!-- Tabs -->
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="dashboard">📊 Dashboard</button>
+  <button class="tab" data-tab="models">🧠 Models</button>
+  <button class="tab" data-tab="sentiment">📈 Sentiment</button>
+  <button class="tab" data-tab="advisors">👥 Advisors</button>
+  <button class="tab" data-tab="backtest">🎯 Backtest</button>
+  <button class="tab" data-tab="cycle">🔁 Cycle</button>
+</nav>
+
+<!-- DASHBOARD TAB -->
+<section class="section tab-content active" id="tab-dashboard">
+  <div class="card">
+    <div class="card-title"><h3>Price Chart · 90 Days</h3><span class="badge" id="chartRange">—</span></div>
+    <div class="chart-container">
+      <svg class="chart-svg" id="chart" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+      <div class="chart-tooltip" id="chartTooltip"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Market Snapshot</h3></div>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat"><div class="stat-label">Market Cap</div><div class="stat-value" id="statMcap">—</div></div>
+      <div class="stat"><div class="stat-label">24h Volume</div><div class="stat-value" id="statVol">—</div></div>
+      <div class="stat"><div class="stat-label">24h High</div><div class="stat-value" id="statHigh">—</div></div>
+      <div class="stat"><div class="stat-label">24h Low</div><div class="stat-value" id="statLow">—</div></div>
+      <div class="stat"><div class="stat-label">ATH</div><div class="stat-value" id="statAth">—</div></div>
+      <div class="stat"><div class="stat-label">From ATH</div><div class="stat-value" id="statAthDelta">—</div></div>
+      <div class="stat"><div class="stat-label">30d Vol (Ann.)</div><div class="stat-value" id="statVolatility">—</div></div>
+      <div class="stat"><div class="stat-label">Halving Day</div><div class="stat-value" id="statHalving">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Probability Forecast · 14 Days</h3><span class="badge">All Models</span></div>
+    <div id="probSection"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Composite Verdict</h3></div>
+    <div class="verdict">
+      <div class="verdict-label">Adaptive Ensemble Says</div>
+      <div class="verdict-value" id="verdictValue">CALCULATING...</div>
+    </div>
+    <div id="verdictDetails" style="font-size:11px; color:var(--text-2); line-height:1.6;"></div>
+  </div>
+</section>
+
+<!-- MODELS TAB -->
+<section class="section tab-content" id="tab-models">
+  <div class="card">
+    <div class="card-title"><h3>Live Model Predictions · 14 Days</h3><span class="badge">Tap to log</span></div>
+    <div id="modelsList"></div>
+    <div style="font-size:10px; color:var(--text-3); margin-top:10px; line-height:1.6; font-family:var(--mono);">
+      Tap a model card to log its current prediction. After 14 days, it auto-checks the prediction against actual price and updates the model's accuracy score. Better models get more weight in the Adaptive Ensemble.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Model Methodology</h3></div>
+    <div style="font-size:11px; color:var(--text-2); line-height:1.6;" id="methodology">
+      <p style="margin-bottom:8px"><b style="color:var(--text)">Random Walk:</b> Naive baseline — tomorrow's price = today's price.</p>
+      <p style="margin-bottom:8px"><b style="color:var(--text)">ARIMA-like (drift):</b> Computes mean log return + AR(1) component.</p>
+      <p style="margin-bottom:8px"><b style="color:var(--text)">GARCH (vol-aware):</b> Drift + conditional volatility band.</p>
+      <p style="margin-bottom:8px"><b style="color:var(--text)">Mean Reversion:</b> Pulls toward 30-day moving average.</p>
+      <p style="margin-bottom:8px"><b style="color:var(--text)">Momentum (EMA):</b> EMA(7) vs EMA(25) crossover signal.</p>
+      <p style="margin-bottom:8px"><b style="color:var(--text)">Sentiment-Weighted:</b> Drift adjusted by community sentiment + macro.</p>
+      <p style="margin-bottom:8px"><b style="color:var(--text)">On-Chain Supply:</b> Cycle position + supply squeeze adjustment.</p>
+      <p><b style="color:var(--orange)">Adaptive Ensemble:</b> Weighted average — weights = inverse RMSE from backtests.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SENTIMENT TAB -->
+<section class="section tab-content" id="tab-sentiment">
+  <div class="card">
+    <div class="card-title"><h3>Community Sentiment</h3><span class="badge">CoinGecko</span></div>
+    <div id="sentimentBars"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Google Trends Proxy</h3><span class="badge">via macro signals</span></div>
+    <div id="googleTrends"></div>
+    <div style="font-size:10px; color:var(--text-3); margin-top:10px; font-family:var(--mono); line-height:1.6;">
+      Note: Google Trends has no public API. We use price-momentum + macro proxies to estimate search interest, calibrated against historical Granger-causality findings.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Macro Signal Board</h3></div>
+    <div class="signal-grid" id="macroSignals"></div>
+    <div style="font-size:11px; color:var(--text-2); margin-top:12px; line-height:1.5;" id="macroSummary"></div>
+  </div>
+</section>
+
+<!-- ADVISORS TAB -->
+<section class="section tab-content" id="tab-advisors">
+  <div class="card">
+    <div class="card-title"><h3>Advisor Panel Consensus</h3></div>
+    <div class="verdict">
+      <div class="verdict-label">Conviction-Weighted</div>
+      <div class="verdict-value" id="advisorConsensus">—</div>
+    </div>
+    <div style="font-size:11px; color:var(--text-2); text-align:center; margin-top:8px;" id="advisorAvgAlloc"></div>
+  </div>
+  <div id="advisorList"></div>
+</section>
+
+<!-- BACKTEST TAB -->
+<section class="section tab-content" id="tab-backtest">
+  <div class="card">
+    <div class="card-title"><h3>Self-Improvement Engine</h3><span class="badge" id="backtestStatus">—</span></div>
+    <div style="font-size:11px; color:var(--text-2); line-height:1.6; margin-bottom:12px;">
+      Every prediction you log is checked after 14 days. Models with lower error get higher weight in the Adaptive Ensemble. The system literally gets smarter as you use it.
+    </div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-label">Total Logged</div><div class="stat-value" id="bt_total">0</div></div>
+      <div class="stat"><div class="stat-label">Resolved</div><div class="stat-value" id="bt_resolved">0</div></div>
+      <div class="stat"><div class="stat-label">Pending</div><div class="stat-value" id="bt_pending">0</div></div>
+      <div class="stat"><div class="stat-label">Avg Error</div><div class="stat-value" id="bt_avg">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Model Leaderboard</h3></div>
+    <div id="leaderboard"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <h3>Prediction Log</h3>
+      <button id="clearLog" style="background:none; border:1px solid var(--line); color:var(--text-3); padding:4px 8px; border-radius:6px; font-family:var(--mono); font-size:9px; cursor:pointer;">Clear</button>
+    </div>
+    <div id="predictionLog"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>System Updates</h3></div>
+    <div class="update-log" id="updateLog"></div>
+  </div>
+</section>
+
+<!-- CYCLE TAB -->
+<section class="section tab-content" id="tab-cycle">
+  <div class="card">
+    <div class="card-title"><h3>Halving Cycle 5</h3><span class="badge">2024 → 2028</span></div>
+    <div class="cycle-bar">
+      <div class="cycle-fill" id="cycleFill" style="width:0%"></div>
+      <div class="cycle-marker" id="cycleMarker" style="left:0%"></div>
+    </div>
+    <div class="cycle-labels">
+      <span>H4 (Apr 2024)</span>
+      <span id="cycleDayLabel">Day —</span>
+      <span>H5 (Apr 2028)</span>
+    </div>
+    <div style="font-size:11px; color:var(--text-2); line-height:1.5; margin-top:14px;" id="cycleNarrative"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Where Were Previous Cycles Now?</h3></div>
+    <div id="cycleCompare"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Composite Cycle Score</h3></div>
+    <div class="verdict" style="margin-bottom:8px;">
+      <div class="verdict-label">Cycle 5 Bullishness</div>
+      <div class="verdict-value" id="cycleScoreValue">—</div>
+    </div>
+    <div style="font-size:11px; color:var(--text-2); line-height:1.6;" id="cycleScoreNote"></div>
+  </div>
+</section>
+
+<div class="footer">
+  Built as academic research · Data: CoinGecko Public API ·<br>
+  <b>Not financial advice.</b> Educational use only.<br>
+  <a href="https://github.com" target="_blank">View on GitHub</a>
+</div>
+
+<button class="refresh-btn" id="refreshBtn" aria-label="Refresh">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="23 4 23 10 17 10"></polyline>
+    <polyline points="1 20 1 14 7 14"></polyline>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+  </svg>
+</button>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration skipped:', err));
+    });
+  }
+</script>
+</body>
+</html>
